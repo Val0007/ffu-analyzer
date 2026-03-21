@@ -1,9 +1,14 @@
 import { defineConfig, loadEnv } from 'vite'
+import tailwindcss from '@tailwindcss/vite'
+
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '..', '')
   if (!env.OPENAI_API_KEY) throw new Error('Missing OPENAI_API_KEY in ../.env')
   return {
+    plugins: [
+      tailwindcss(),
+    ],
     server: {
       proxy: {
         '/api': {

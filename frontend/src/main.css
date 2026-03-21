@@ -1,0 +1,76 @@
+@import "tailwindcss";
+@import 'react-resizable/css/styles.css';
+
+
+:root {
+  --bg-primary:     #0a0a0a;
+  --bg-secondary:   #111111;
+  --bg-elevated:    #1a1a1a;
+  --border:         #222222;
+  --accent:         #ff1e00;
+  --accent-dim:     rgba(255, 30, 0, 0.12);
+  --text-primary:   #ffffff;
+  --text-secondary: #888888;
+  --text-dim:       #333333;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-primary:hover {
+  background: #0a142e;
+  transform: skewX(-2deg);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-outline:hover {
+  background: #0a142e;
+  border-color: #0a142e;
+  transform: skewX(-2deg);
+}
+
+.react-resizable-handle {
+  width: 4px;
+  background: var(--border);
+  cursor: col-resize;
+  transition: background 0.15s ease;
+}
+
+.react-resizable-handle:hover,
+.react-resizable-handle-e:active
+{
+  background: var(--accent);
+}
+
+.react-resizable-handle-e{
+  right:-1px;
+  transform: none;
+}
+:root {
+  --accent-dim: rgba(255, 30, 0, 0.1);
+}
+
+.doc-item:hover {
+  border-color: white !important;
+}
+

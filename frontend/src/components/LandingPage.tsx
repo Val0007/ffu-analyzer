@@ -83,12 +83,12 @@ export default function LandingPage({ onReady }: Props) {
                         </code>{' '}
                         to begin
                     </p>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Takes 4-5 min to finish</p>
-                    <button onClick={handleStartSummary} className="btn-primary px-8 py-3 text-sm font-semibold tracking-wide uppercase">
-                        Start Analyzing
-                    </button>
-                    <button onClick={onReady} className="cursor-pointer text-white py-3 text-sm font-semibold tracking-wide uppercase underline">
-                        Use Old Analysis to go to chat quicker!
+                    {/* <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Takes 4-5 min to finish</p> */}
+                    {/* <button onClick={handleStartSummary} className="btn-primary px-8 py-3 text-sm font-semibold tracking-wide uppercase">
+                        Start Chatting
+                    </button> */}
+                    <button onClick={onReady} className="btn-primary px-8 py-3 text-sm font-semibold tracking-wide uppercase">
+                        Start Chatting (Docs were processed already!)
                     </button>
                     {error && <p className="text-xs" style={{ color: 'var(--accent)' }}>{error}</p>}
                 </div>

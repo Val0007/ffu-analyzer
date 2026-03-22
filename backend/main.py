@@ -465,6 +465,9 @@ CRITICAL QUOTE RULES:
             for call in msg.tool_calls:
                 args = json.loads(call.function.arguments)
                 path = data_dir / args["filename"]
+                print(f"read_document called: {filename}")
+                print(f"full path: {path}")
+                print(f"exists: {path.exists()}")
                 try:
                     content = extract(path)
                 except Exception as e:

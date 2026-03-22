@@ -371,6 +371,7 @@ def chat_new(body: dict):
     rows = dbnew.execute(
         "SELECT filename, summary_json FROM documents ORDER BY id"
     ).fetchall()
+    print(rows)
     print("new request")
     doc_index = []
     for filename, summary_json in rows:
@@ -466,21 +467,22 @@ CRITICAL QUOTE RULES:
             messages.append(msg.model_dump(exclude_none=True))
             for call in msg.tool_calls:
                 args = json.loads(call.function.arguments)
-                filename = unicodedata.normalize('NFC', args["filename"])
-                path = data_dir / filename
-                print(f"read_document called: {filename}")
-                print(f"full path: {path}")
-                print(f"exists: {path.exists()}")
-                row = db.execute(
-                    "SELECT content FROM documents WHERE filename = ?",(filename,)).fetchone()
-                content = row[0] if row and row[0] else "Document not found."
+                raw = unquote(args['filename'])
+                normalized = unicodedata.normalize('NFC', raw)
+                content = dbnew.execute(
+                    "SELECT content FROM documents WHERE filename = ?",
+                    (normalized,)
+                    ).fetchone()
+                print(f"GPT requested: {repr(args['filename'])}")
+                print(f"normalized to: {repr(normalized)}")
+                print(f"DB returned: {repr(content[0]) if content else 'None'}")
                 # tell frontend which file is being read
                 yield f"data: {json.dumps({'reading': args['filename']})}\n\n"
 
                 messages.append({
                     "role":         "tool",
                     "tool_call_id": call.id,
-                    "content":      content,
+                    "content":      content[0],
                 })
 
         #stream the response after reading of files

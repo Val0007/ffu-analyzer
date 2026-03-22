@@ -35,15 +35,26 @@ export default function DocumentContent({ filename, highlightQuotes }: Props) {
     const [markIndex, setMarkIndex] = useState(0)
 
     useEffect(() => {
-        if (!filename) return
+        const controller = new AbortController()
         setLoading(true)
-        fetch(`${API}/document?filename=${encodeURIComponent(filename)}`)
+
+        fetch(`${API}/document?filename=${encodeURIComponent(filename)}`, {
+            signal: controller.signal
+        })
             .then(r => r.json())
-            .then(data => setContent(cleanContent(data.content)))
+            .then(data => setContent(data.content))
+            .catch(e => {
+                if (e.name === 'AbortError') return // ignore cancelled requests
+                console.error(e)
+            })
             .finally(() => setLoading(false))
+
+        // cleanup — cancel if filename changes before fetch completes
+        return () => controller.abort()
     }, [filename])
 
     const highlighted = useMemo(() => {
+        if (loading) return ''
         if (highlightQuotes == null) return content
         if (!highlightQuotes.length || !content) return content
 
@@ -61,7 +72,7 @@ export default function DocumentContent({ filename, highlightQuotes }: Props) {
             )
         })
         return result
-    }, [content, highlightQuotes])
+    }, [content, highlightQuotes,loading])
 
     useEffect(() => {
         if (highlightQuotes == null) return

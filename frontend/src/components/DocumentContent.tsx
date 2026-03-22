@@ -6,6 +6,8 @@ interface Props {
     highlightQuotes: string[] | null
 }
 
+const API = window.location.hostname === 'localhost' ? '/api' : ''
+
 
 const normalizeText = (text: string) => text
     .replace(/<br\s*\/?>/gi, ' ')  // replace <br> with space
@@ -35,7 +37,7 @@ export default function DocumentContent({ filename, highlightQuotes }: Props) {
     useEffect(() => {
         if (!filename) return
         setLoading(true)
-        fetch(`/api/document?filename=${encodeURIComponent(filename)}`)
+        fetch(`${API}/document?filename=${encodeURIComponent(filename)}`)
             .then(r => r.json())
             .then(data => setContent(cleanContent(data.content)))
             .finally(() => setLoading(false))

@@ -1,9 +1,7 @@
 node_modules
 .env
 ffu.db
-ffunew.db
 backend/ffu.db
-backend/ffunew.db
 backend/__pycache__/
 .DS_Store
 backend/ffu.db-journal

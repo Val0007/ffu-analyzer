@@ -4,7 +4,7 @@ WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ ./
-RUN npm run build
+RUN npm run build || (echo "BUILD FAILED" && exit 1)
 
 # Stage 2 — run backend
 FROM python:3.12-slim

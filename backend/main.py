@@ -558,6 +558,8 @@ def search_document(filename: str):
     except Exception as e:
         return {"error": str(e)}
     
-dist_path = "../frontend/dist"
+dist_path = Path(__file__).parent.parent / "dist"
 if os.path.exists(dist_path):
-    app.mount("/", StaticFiles(directory=dist_path, html=True), name="static")
+    app.mount("/", StaticFiles(directory=str(dist_path), html=True), name="static")
+else:
+    print(f"dist not found at {dist_path}")

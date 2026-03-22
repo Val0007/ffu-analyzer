@@ -464,7 +464,8 @@ CRITICAL QUOTE RULES:
             messages.append(msg.model_dump(exclude_none=True))
             for call in msg.tool_calls:
                 args = json.loads(call.function.arguments)
-                path = data_dir / args["filename"]
+                filename = unicodedata.normalize('NFC', args["filename"])
+                path = data_dir / filename
                 print(f"read_document called: {filename}")
                 print(f"full path: {path}")
                 print(f"exists: {path.exists()}")
@@ -497,6 +498,7 @@ CRITICAL QUOTE RULES:
                 yield f"data: {json.dumps({'token': delta.content})}\n\n"
 
         # response stream finished , send the sources as one chunk
+        sources = []
         if '<|SOURCES|>' in collected:
             parts = collected.split('<|SOURCES|>')
             answer = parts[0].strip()

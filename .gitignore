@@ -1,8 +1,23 @@
 node_modules
 .env
 ffu.db
+ffunew.db
 backend/ffu.db
+backend/ffunew.db
 backend/__pycache__/
 .DS_Store
 backend/data/
 backend/ffu.db-journal
+
+# Python
+backend/bin/
+backend/lib/
+backend/include/
+backend/pyvenv.cfg
+__pycache__/
+*.pyc
+ffunew.db
+ffu.db
+
+# Frontend
+frontend/node_modules/

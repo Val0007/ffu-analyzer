@@ -6,7 +6,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
+import unicodedata
 
+from urllib.parse import unquote
 
 import pymupdf4llm
 from fastapi import FastAPI
@@ -191,6 +194,7 @@ async def lifespan(app):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.mount("/files", StaticFiles(directory="data"), name="files")
 
 @app.post("/process")
 def process():
@@ -294,7 +298,6 @@ def process_one(path: Path) -> dict:
 
 
 
-
 @app.post("/summary")
 def process_summary():
     dbnew.execute("DELETE FROM documents")
@@ -305,69 +308,68 @@ def process_summary():
     if not paths:
         return {"status": "no_files_found", "count": 0}
 
-    processed, failed = [], []
+    total = len(paths)
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        futures = {pool.submit(process_one, path): path for path in paths}
+    def generate():
+        processed, failed = [], []
 
-        for future in as_completed(futures):
-            path = futures[future]
-            try:
-                result = future.result()
-                s = result["summary"]
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(process_one, path): path for path in paths}
 
+            for future in as_completed(futures):
+                path = futures[future]
+                try:
+                    result = future.result()
+                    s = result["summary"]
 
-                if "error" in s:
-                    logger.error(f"[{path.name}] {s['error']}")
-                    failed.append({"filename": path.name, "error": s["error"]})
-                    continue
+                    if "error" in s:
+                        logger.error(f"[{path.name}] {s['error']}")
+                        failed.append({"filename": path.name, "error": s["error"]})
+                        yield f"data: {json.dumps({'status': 'failed', 'filename': path.name, 'processed': len(processed), 'failed': len(failed), 'total': total})}\n\n"
+                        continue
 
-                dbnew.execute(
-                    """
-                    INSERT OR REPLACE INTO documents
-                        (filename, summary_json, document_type,
-                         topics, revision_date, supersedes)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        path.name,
-                        json.dumps(s, ensure_ascii=False),
-                        s.get("document_type", "unknown"),
-                        ",".join(s.get("topics_covered", [])),
-                        s.get("revision", {}).get("date") or "",
-                        s.get("revision", {}).get("supersedes") or "",
-                    ),
-                )
-                dbnew.commit()
+                    dbnew.execute(
+                        """
+                        INSERT OR REPLACE INTO documents
+                            (filename, summary_json, document_type,
+                             topics, revision_date, supersedes)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            path.name,
+                            json.dumps(s, ensure_ascii=False),
+                            s.get("document_type", "unknown"),
+                            ",".join(s.get("topics_covered", [])),
+                            s.get("revision", {}).get("date") or "",
+                            s.get("revision", {}).get("supersedes") or "",
+                        ),
+                    )
+                    dbnew.commit()
 
-                logger.info(f"Saved {path.name}")
-                processed.append({
-                    "filename":      path.name,
-                    "document_type": s.get("document_type"),
-                    "revision_date": s.get("revision", {}).get("date"),
-                    "supersedes":    s.get("revision", {}).get("supersedes"),
-                })
+                    processed.append(path.name)
+                    logger.info(f"Saved {path.name}")
 
-            except Exception as e:
-                logger.error(f"[{path.name}] unexpected error: {e}")
-                failed.append({"filename": path.name, "error": str(e)})
+                    yield f"data: {json.dumps({'status': 'ok', 'filename': path.name, 'processed': len(processed), 'failed': len(failed), 'total': total})}\n\n"
 
-    return {
-        "status":      "ok",
-        "total_files": len(paths),
-        "processed":   len(processed),
-        "failed":      len(failed),
-        "details":     {"processed": processed, "failed": failed},
-    }
+                except Exception as e:
+                    logger.error(f"[{path.name}] unexpected error: {e}")
+                    failed.append({"filename": path.name, "error": str(e)})
+                    yield f"data: {json.dumps({'status': 'failed', 'filename': path.name, 'processed': len(processed), 'failed': len(failed), 'total': total})}\n\n"
 
+        yield f"data: {json.dumps({'status': 'done', 'processed': len(processed), 'failed': len(failed), 'total': total})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    )
 
 @app.post("/chatnew")
 def chat_new(body: dict):
-    # All summaries sent on every request — this is the routing map
     rows = dbnew.execute(
         "SELECT filename, summary_json FROM documents ORDER BY id"
     ).fetchall()
- 
+    print("new request")
     doc_index = []
     for filename, summary_json in rows:
         try:
@@ -398,26 +400,26 @@ ROUTING RULES:
 - If a document's do_not_use_for matches the question type, skip it.
 
 RESPONSE FORMAT:
-You must always respond in this JSON format:
-{
-  "answer": "<your full answer here>",
-  "sources": [
-    {
-      "filename": "<exact filename>",
-      "quotes": [
-        "<exact verbatim quote from document used in your answer, max 2 per file>",
-        "<second quote if needed>"
-      ]
-    }
-  ]
-}
+First write your full answer as plain text without sources.
+Then on a new line write exactly: <|SOURCES|>
+Then write the sources JSON array and nothing else:
+[
+  {
+    "filename": "exact filename including .pdf",
+    "quotes": [
+      "VERBATIM text copied character for character from the document, in the original Swedish",
+      "another VERBATIM quote in original Swedish"
+    ]
+  }
+]
 
-QUOTE RULES:
-- quotes must be verbatim text copied exactly from the document
-- maximum 5 quotes per file
-- only include files you actually read and used
-- quotes should be the most important lines that directly support your answer
-- these quotes will be used to highlight text in the original PDF so they must match exactly
+CRITICAL QUOTE RULES:
+- quotes must be copied VERBATIM from the document
+- quotes must be in the ORIGINAL LANGUAGE (Swedish)
+- do NOT summarise or translate
+- do NOT write descriptions like "This is a..."
+- copy the exact Swedish text as it appears in the document
+- these quotes will be used to highlight text in the PDF so they MUST match exactly
 - Never repeat the same filename in sources more than once. 
   If multiple quotes come from the same file, group them under one source entry with multiple quotes.
 """
@@ -442,8 +444,12 @@ QUOTE RULES:
         },
     }]
  
-    try:
+
+    def generate():
+        nonlocal messages
+        print("generate() started")
         for _ in range(10):
+            # let tool call finish first , stream only documents read
             resp = client.chat.completions.create(
                 model="gpt-5.4",
                 messages=messages,
@@ -451,16 +457,11 @@ QUOTE RULES:
                 tool_choice="auto",
             )
             msg = resp.choices[0].message
+
             if not msg.tool_calls:
-                    raw = msg.content or ""
-                    try:
-                        parsed = json.loads(raw)
-                        return parsed  # returns {answer, sources} directly
-                    except json.JSONDecodeError:
-                        return {"answer": raw, "sources": []}
- 
+                break
+
             messages.append(msg.model_dump(exclude_none=True))
- 
             for call in msg.tool_calls:
                 args = json.loads(call.function.arguments)
                 path = data_dir / args["filename"]
@@ -468,18 +469,50 @@ QUOTE RULES:
                     content = extract(path)
                 except Exception as e:
                     content = f"Error reading file: {e}"
- 
+
+                # tell frontend which file is being read
+                yield f"data: {json.dumps({'reading': args['filename']})}\n\n"
+
                 messages.append({
                     "role":         "tool",
                     "tool_call_id": call.id,
                     "content":      content,
                 })
- 
-        return {"response": "Stopped after 10 tool iterations."}
-    except Exception as e:
-        return {"response": f"Error: {e}"}
- 
 
+        #stream the response after reading of files
+        stream = client.chat.completions.create(
+            model="gpt-5.4",
+            messages=messages,
+            stream=True,
+        )
+
+        collected = ""
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+            if delta.content:
+                collected += delta.content
+                yield f"data: {json.dumps({'token': delta.content})}\n\n"
+
+        # response stream finished , send the sources as one chunk
+        if '<|SOURCES|>' in collected:
+            parts = collected.split('<|SOURCES|>')
+            answer = parts[0].strip()
+            try:
+                sources = json.loads(parts[1].strip())
+            except:
+                 sources = []
+
+        yield f"data: {json.dumps({'done': True, 'sources': sources})}\n\n"
+
+    print("outside generate")
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        }
+        )
 
 @app.get("/getsummaries")
 def get_summaries():
@@ -512,3 +545,19 @@ def get_summaries():
             })
     
     return result
+
+@app.get("/document")
+def search_document(filename: str):
+    filename = unicodedata.normalize('NFC', unquote(filename))
+    path = data_dir / filename
+    content = extract(path)  # markdown text
+    print(f"document requestedd: {filename}")
+    try:
+        content = extract(path)
+        return {"filename": filename, "content": content}
+    except Exception as e:
+        return {"error": str(e)}
+    
+dist_path = "../frontend/dist"
+if os.path.exists(dist_path):
+    app.mount("/", StaticFiles(directory=dist_path, html=True), name="static")

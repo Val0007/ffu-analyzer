@@ -4,54 +4,73 @@ import Sidebar from './Sidebar'
 import { getSummaries } from '../api/client'
 import { FFUDocument } from '../types'
 import ChatPanel from './Chatpanel'
-
+import DocumentContent from './DocumentContent'
 
 export default function MainView() {
 
     const [activeDocument, setActiveDocument] = useState<string | null>(null)
     const [documents, setDocuments] = useState<FFUDocument[]>([])
-
-useEffect(() => {
-   getSummaries().then(res => setDocuments(res))
-}, [])
+    const [highlightQuotes, setHighlightQuotes] = useState<string[]>([])
+    const [isDragging, setIsDragging] = useState(false)
 
 
-  return (
-    <div className="h-screen w-screen flex overflow-hidden"
-      style={{ background: 'var(--bg-primary)' }}>
+    useEffect(() => {
+        getSummaries().then(res => setDocuments(res))
+    }, [])
 
-<Sidebar
- documents={documents}
-  activeDocument={activeDocument}
-  onDocumentSelect={setActiveDocument}
-/>
+    function handleSourceClick(filename: string, quotes: string[]) {
+        setActiveDocument(filename)
+        setHighlightQuotes(quotes)
+    }
+
+    return (
+        <div className="h-screen w-screen flex overflow-hidden"
+            style={{ background: 'var(--bg-primary)' }}>
+
+            <Sidebar
+                documents={documents}
+                activeDocument={activeDocument}
+                onDocumentSelect={(filename) => {
+                    setActiveDocument(filename)
+                    setHighlightQuotes(null)
+                }}
+            />
 
 
-      {/* Document Viewer — resizable */}
-      <ResizableBox
-        width={700}
-        axis="x"
-        minConstraints={[300, Infinity]}
-        maxConstraints={[1200, Infinity]}
-        resizeHandles={['e']}
-        >
-        <div className="h-full w-full overflow-hidden"
-          style={{ borderRight: '1px solid var(--border)' }}>
-          {/* DocumentViewer goes here */}
+            <ResizableBox
+                width={700}
+                axis="x"
+                minConstraints={[300, Infinity]}
+                maxConstraints={[1200, Infinity]}
+                resizeHandles={['e']}
+                onResizeStart={() => setIsDragging(true)}
+                onResizeStop={() => setIsDragging(false)}
+                className={isDragging ? 'is-dragging' : ''} //changes resizing icon color during drag
+            >
+                <div className="h-full w-full overflow-hidden"
+                    style={{ borderRight: '1px solid var(--border)' }}>
+                    {activeDocument ? (
+                        <DocumentContent
+                            filename={activeDocument}
+                            highlightQuotes={highlightQuotes}
+                        />
+                    ) : (
+                        <div className="h-full flex items-center justify-center">
+                            <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
+                                Select a document or click "See source"
+                            </p>
+                        </div>
+                    )}
+
+                </div>
+            </ResizableBox>
+
+            <div className="flex-1 h-full overflow-hidden">
+                <ChatPanel
+                    onSourceClick={handleSourceClick}
+                />
+            </div>
+
         </div>
-      </ResizableBox>
-
-      {/* Chat Panel — takes remaining space */}
-      <div className="flex-1 h-full overflow-hidden">
-        <ChatPanel
-  onSourceClick={(filename, quote) => {
-    const doc = documents.find(d => d.filename === filename)
-    if (doc) setActiveDocument(doc.filename)
-    // setHighlightQuote(quote)
-  }}
-/>
-      </div>
-
-    </div>
-  )
+    )
 }

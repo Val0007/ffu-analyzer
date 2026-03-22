@@ -87,6 +87,9 @@ export default function LandingPage({ onReady }: Props) {
                     <button onClick={handleStartSummary} className="btn-primary px-8 py-3 text-sm font-semibold tracking-wide uppercase">
                         Start Analyzing
                     </button>
+                    <button onClick={onReady} className="cursor-pointer text-white py-3 text-sm font-semibold tracking-wide uppercase underline">
+                        Use Old Analysis to go to chat quicker!
+                    </button>
                     {error && <p className="text-xs" style={{ color: 'var(--accent)' }}>{error}</p>}
                 </div>
             )}

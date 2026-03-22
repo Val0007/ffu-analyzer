@@ -85,7 +85,7 @@ export default function LandingPage({ onReady }: Props) {
                     </p>
                     <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Takes 1-2 min to finish</p>
                     <button onClick={handleStartSummary} className="btn-primary px-8 py-3 text-sm font-semibold tracking-wide uppercase">
-                        Start Summary
+                        Start Analyzing
                     </button>
                     {error && <p className="text-xs" style={{ color: 'var(--accent)' }}>{error}</p>}
                 </div>

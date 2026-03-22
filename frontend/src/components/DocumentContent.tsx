@@ -42,7 +42,8 @@ export default function DocumentContent({ filename, highlightQuotes }: Props) {
             signal: controller.signal
         })
             .then(r => r.json())
-            .then(data => setContent(data.content))
+            .then(data => {
+                setContent(data.content)})
             .catch(e => {
                 if (e.name === 'AbortError') return // ignore cancelled requests
                 console.error(e)

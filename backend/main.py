@@ -178,6 +178,7 @@ async def lifespan(app):
         CREATE TABLE IF NOT EXISTS documents (
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             filename      TEXT UNIQUE,
+            content       TEXT, 
             summary_json  TEXT,
             document_type TEXT,
             topics        TEXT,
@@ -291,8 +292,8 @@ def process_one(path: Path) -> dict:
 
     logger.info(f"Summarising {path.name}...")
     summary = generate_summary(path.name, content)
-
-    return {"path": path, "summary": summary}
+    
+    return {"path": path, "summary": summary, "content": content} 
 
 
 
@@ -321,22 +322,23 @@ def process_summary():
                 try:
                     result = future.result()
                     s = result["summary"]
-
+                    content = result["content"]
                     if "error" in s:
                         logger.error(f"[{path.name}] {s['error']}")
                         failed.append({"filename": path.name, "error": s["error"]})
                         yield f"data: {json.dumps({'status': 'failed', 'filename': path.name, 'processed': len(processed), 'failed': len(failed), 'total': total})}\n\n"
                         continue
-
+                    normalized_name = unicodedata.normalize('NFC', path.name)
                     dbnew.execute(
                         """
                         INSERT OR REPLACE INTO documents
-                            (filename, summary_json, document_type,
+                            (filename, content, summary_json, document_type,
                              topics, revision_date, supersedes)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
-                            path.name,
+                            normalized_name,
+                            content,                      
                             json.dumps(s, ensure_ascii=False),
                             s.get("document_type", "unknown"),
                             ",".join(s.get("topics_covered", [])),
@@ -469,11 +471,9 @@ CRITICAL QUOTE RULES:
                 print(f"read_document called: {filename}")
                 print(f"full path: {path}")
                 print(f"exists: {path.exists()}")
-                try:
-                    content = extract(path)
-                except Exception as e:
-                    content = f"Error reading file: {e}"
-
+                row = db.execute(
+                    "SELECT content FROM documents WHERE filename = ?",(filename,)).fetchone()
+                content = row[0] if row and row[0] else "Document not found."
                 # tell frontend which file is being read
                 yield f"data: {json.dumps({'reading': args['filename']})}\n\n"
 
@@ -553,13 +553,21 @@ def get_summaries():
 
 @app.get("/document")
 def search_document(filename: str):
-    filename = unicodedata.normalize('NFC', unquote(filename))
-    path = data_dir / filename
-    content = extract(path)  # markdown text
-    print(f"document requestedd: {filename}")
+    raw = unquote(filename)
+    normalized = unicodedata.normalize('NFC', raw)
+    row = dbnew.execute(
+        "SELECT content FROM documents WHERE filename = ?",
+        (normalized,)
+    ).fetchone()
+
+    if not row:
+    # show all filenames in db to compare
+        all_files = dbnew.execute("SELECT filename FROM documents").fetchall()
+        print(f"requested: {repr(filename)}")
+        print(f"db filenames: {[repr(r[0]) for r in all_files[:5]]}")
     try:
-        content = extract(path)
-        return {"filename": filename, "content": content}
+        if row and row[0]:
+            return {"filename": filename, "content": row[0]}
     except Exception as e:
         return {"error": str(e)}
     
@@ -568,3 +576,5 @@ if os.path.exists(dist_path):
     app.mount("/", StaticFiles(directory=str(dist_path), html=True), name="static")
 else:
     print(f"dist not found at {dist_path}")
+
+

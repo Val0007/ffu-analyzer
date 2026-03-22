@@ -73,7 +73,6 @@ export async function sendMessage(
 
         buffer += decoder.decode(value)  // append chunk to buffer
         const events = buffer.split('\n\n') //splits when successfully received a full token or filename with \n\n
-        console.log(buffer)
 
         //Everything before the last \n\n is a complete event
         //Everything after the last \n\n is either empty or incomplete

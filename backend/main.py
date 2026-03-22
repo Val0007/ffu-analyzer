@@ -27,7 +27,7 @@ dbnew=sqlite3.connect(Path(__file__).with_name("ffunew.db"), check_same_thread=F
 print(os.environ)
 print("key is ",os.environ.get("OPENAI_API_KEY"))
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-data_dir = Path("data")
+data_dir = Path(__file__).parent / "data"
 extract = lambda path: pymupdf4llm.to_markdown(str(path), ignore_images=True, ignore_graphics=True)
 
 

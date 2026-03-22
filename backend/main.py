@@ -194,7 +194,7 @@ async def lifespan(app):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-app.mount("/files", StaticFiles(directory="data"), name="files")
+
 
 @app.post("/process")
 def process():
